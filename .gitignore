@@ -6,6 +6,7 @@
 # Python
 __pycache__/
 *.pyc
+.ipynb_checkpoints/
 
 # Secrets — never commit these
 .env
