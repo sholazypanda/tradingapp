@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Alpha — Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="top-nav">
+    <span class="brand">◆ ALPHA</span>
+    <a href="/">Dashboard</a>
+    <a href="/scan?watchlist={{ watchlist }}">Scanner</a>
+  </div>
+
+  <h1>Watchlist</h1>
+  <p class="subtitle">Read-only report cards, six-agent consensus — no orders are placed by this app (tradingskills.md §13).</p>
+
+  {% if reports %}
+  <div class="ticker-tape">
+    <div class="ticker-tape-track">
+      {% for r in reports + reports %}
+      <span class="{{ 'tick-up' if r.day_change_pct >= 0 else 'tick-down' }}">
+        {{ r.ticker }} {{ "%.2f"|format(r.entry) }} {{ "%+.2f"|format(r.day_change_pct) }}%
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <form class="watchlist-form" method="get" action="/">
+    <input type="text" name="watchlist" placeholder="AAPL,MSFT,NVDA" value="{{ watchlist }}">
+    <button type="submit">Load</button>
+  </form>
+
+  {% if errors %}
+  <ul class="error-list">
+    {% for e in errors %}<li>{{ e.ticker }}: {{ e.error }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  {% for r in reports %}
+  <div class="card">
+    <div class="card-header">
+      <h3><a href="/ticker/{{ r.ticker }}">{{ r.ticker }}</a></h3>
+      <span class="badge {{ r.signal|lower|replace(' ', '-') }}">{{ r.signal }}</span>
+    </div>
+    <div class="meta-row">
+      <span>Entry: <strong>{{ "%.2f"|format(r.entry) }}</strong></span>
+      <span>Stop: <strong>{{ "%.2f"|format(r.stop_loss) }}</strong></span>
+      <span>Targets: <strong>{{ r.targets|map("string")|join(", ") }}</strong></span>
+      <span>R/R: <strong>{{ r.risk_reward }}</strong></span>
+      <span>Day: <strong class="{{ 'tick-up' if r.day_change_pct >= 0 else 'tick-down' }}">{{ "%+.2f"|format(r.day_change_pct) }}%</strong></span>
+    </div>
+    <div class="confidence-note {{ 'disagreement' if r.disagreement }}">{{ r.confidence }}</div>
+  </div>
+  {% else %}
+  <p class="empty-state">No tickers loaded.</p>
+  {% endfor %}
+</body>
+</html>

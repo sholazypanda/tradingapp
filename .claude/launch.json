@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "alpha-flask",
+      "runtimeExecutable": ".venv/bin/python3",
+      "runtimeArgs": ["-m", "flask", "--app", "alpha.app", "run", "--port", "5050"],
+      "port": 5050
+    }
+  ]
+}

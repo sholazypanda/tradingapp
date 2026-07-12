@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Alpha — {{ report.ticker }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="top-nav">
+    <span class="brand">◆ ALPHA</span>
+    <a href="/">Dashboard</a>
+    <a href="/scan">Scanner</a>
+  </div>
+
+  <div class="card-header">
+    <h1>{{ report.ticker }}</h1>
+    <span class="badge {{ report.signal|lower|replace(' ', '-') }}">{{ report.signal }}</span>
+  </div>
+
+  <div class="meta-row">
+    <span>Entry: <strong>{{ "%.2f"|format(report.entry) }}</strong></span>
+    <span>Stop-loss: <strong>{{ "%.2f"|format(report.stop_loss) }}</strong></span>
+    <span>Targets: <strong>{{ report.targets|map("string")|join(", ") }}</strong></span>
+    <span>Risk/Reward: <strong>{{ report.risk_reward }}</strong></span>
+    <span>Day: <strong class="{{ 'tick-up' if report.day_change_pct >= 0 else 'tick-down' }}">{{ "%+.2f"|format(report.day_change_pct) }}%</strong></span>
+    <span>Budget used: <strong>{{ report.budget_used }}</strong></span>
+  </div>
+  <div class="confidence-note {{ 'disagreement' if report.disagreement }}">{{ report.confidence }}</div>
+
+  <div class="section">
+    <div class="section-title"><span class="dot"></span><h2>Price (60-bar window)</h2></div>
+    <div class="spark-wrap">{{ sparkline_svg | safe }}</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="dot"></span><h2>Agent consensus</h2></div>
+    <div class="agent-grid">
+      {% for o in report.opinions %}
+      <div class="agent-node {{ o.signal }}">
+        <div class="agent-node-header">
+          <div class="agent-avatar">{{ o.persona[0] }}</div>
+          <div>
+            <div class="agent-name">{{ o.persona }}</div>
+            <div class="agent-role">
+              {% if o.persona == "Rook" %}Structure Analyst
+              {%- elif o.persona == "Cortex" %}Quant Forecaster
+              {%- elif o.persona == "Vance" %}Fundamentals Analyst
+              {%- elif o.persona == "Sable" %}Sentiment Analyst
+              {%- elif o.persona == "Ledger" %}Risk/Portfolio Manager
+              {%- elif o.persona == "Wick" %}Setup Scanner
+              {%- endif %}
+            </div>
+          </div>
+          <span class="agent-signal-tag">{{ o.signal }}</span>
+        </div>
+        <div class="agent-rationale">{{ o.rationale }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="dot"></span><h2>Key levels</h2></div>
+    <p>Range zone: <strong>{{ report.key_levels.range_zone }}</strong></p>
+    <table>
+      <tr><th>Liquidity level</th><th>Side</th><th>Touches</th><th>Crossed</th></tr>
+      {% for lvl in report.key_levels.liquidity_levels %}
+      <tr>
+        <td>{{ "%.2f"|format(lvl.price) }}</td>
+        <td>{{ lvl.side }}</td>
+        <td>{{ lvl.touch_count }}</td>
+        <td>{{ "yes" if lvl.crossed else "no" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="empty-state">No liquidity levels detected in this window.</td></tr>
+      {% endfor %}
+    </table>
+    <table>
+      <tr><th>Order block</th><th>Bias</th><th>Mitigated</th></tr>
+      {% for ob in report.key_levels.order_blocks %}
+      <tr>
+        <td>{{ "%.2f"|format(ob.low) }} – {{ "%.2f"|format(ob.high) }}</td>
+        <td>{{ ob.bias }}</td>
+        <td>{{ "yes" if ob.mitigated else "no" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="empty-state">No order blocks detected in this window.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="dot"></span><h2>Model forecast — Skill 6.1 (learned signal)</h2></div>
+    {% if report.model_forecast.available %}
+    <p>Predicted next-day return: <strong>{{ "%.3f"|format(report.model_forecast.predicted_next_day_return * 100) }}%</strong></p>
+    {% else %}
+    <p class="empty-state">{{ report.model_forecast.reason }}</p>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="dot"></span><h2>Execution log</h2></div>
+    <p class="empty-state">Live trace of every tool call and evaluation step each agent actually ran for this analysis.</p>
+    <div class="exec-log">
+      {% for e in report.execution_log %}
+      <div class="log-line">
+        <span class="log-time">{{ e.time }}</span>
+        <span class="log-actor {{ e.actor }}">{{ e.actor }}</span>
+        <span class="log-kind {{ e.kind }}">{{ e.kind }}</span>
+        <span class="log-action">{{ e.action }}{% if e.result %}<span class="log-result">{{ e.result }}</span>{% endif %}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="dot"></span><h2>Confluence notes</h2></div>
+    <ul>
+      {% for note in report.confluence_notes %}<li>{{ note }}</li>{% endfor %}
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="dot"></span><h2>Plain-text report card</h2></div>
+    <pre>{{ plain_text }}</pre>
+  </div>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# Virtual environment / IDE
+.venv/
+.idea/
+*.iml
+
+# Python
+__pycache__/
+*.pyc
+
+# Secrets — never commit these
+.env
+*.env
+
+# Generated at runtime, not source
+journal/
+data/
+notebooks/artifacts/
+notebooks/artifacts_market_timing/
+
+# OS cruft
+.DS_Store

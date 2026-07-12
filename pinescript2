@@ -1,0 +1,135 @@
+pinescript2
+//@version=6
+indicator("Combined: Bollinger + RVOL + RSI + ATR", shorttitle="BB+RVOL+RSI+ATR", overlay=true, max_labels_count=500)
+
+// =========================
+// Bollinger Bands Inputs
+// =========================
+grpBB = "Bollinger Bands"
+bbLength = input.int(20, "BB Length", minval=1, group=grpBB)
+bbMult = input.float(2.0, "BB Multiplier", minval=0.001, maxval=50, group=grpBB)
+showBB = input.bool(true, "Show Bollinger Bands", group=grpBB)
+
+// =========================
+// RSI Inputs
+// =========================
+grpRSI = "RSI"
+rsiLength = input.int(14, "RSI Length", minval=1, group=grpRSI)
+rsiOverbought = input.int(70, "Overbought", group=grpRSI)
+rsiOversold = input.int(30, "Oversold", group=grpRSI)
+showRSISignals = input.bool(true, "Show RSI OB/OS signals on chart", group=grpRSI)
+
+// =========================
+// ATR Inputs
+// =========================
+grpATR = "ATR"
+atrLength = input.int(14, "ATR Length", minval=1, group=grpATR)
+atrSmoothing = input.string("RMA", "ATR Smoothing", options=["RMA", "SMA", "EMA", "WMA"], group=grpATR)
+
+// =========================
+// RVOL Inputs
+// =========================
+grpRVOL = "Relative Volume"
+rvolLookback = input.int(30, "RVOL Lookback", minval=1, group=grpRVOL)
+rvolThreshold = input.float(1.5, "RVOL Alert Threshold", step=0.1, group=grpRVOL)
+showRVOLSignals = input.bool(true, "Show RVOL spike signals", group=grpRVOL)
+
+// =========================
+// Display
+// =========================
+grpDisplay = "Display"
+showInfoTable = input.bool(true, "Show Info Table (RSI/ATR/RVOL)", group=grpDisplay)
+tablePosition = input.string("Top Right", "Table Position", options=["Top Right", "Top Left", "Bottom Right", "Bottom Left"], group=grpDisplay)
+
+// =========================
+// Bollinger Bands Calculation
+// =========================
+bbBasis = ta.sma(close, bbLength)
+bbDev = bbMult * ta.stdev(close, bbLength)
+bbUpper = bbBasis + bbDev
+bbLower = bbBasis - bbDev
+
+bbBasisPlot = plot(showBB ? bbBasis : na, "BB Basis", color=color.blue, linewidth=1)
+bbUpperPlot = plot(showBB ? bbUpper : na, "BB Upper", color=color.red, linewidth=1)
+bbLowerPlot = plot(showBB ? bbLower : na, "BB Lower", color=color.green, linewidth=1)
+fill(bbUpperPlot, bbLowerPlot, color=color.new(color.blue, 90), title="BB Fill")
+
+// BB signals
+bbBuySignal = ta.crossover(close, bbLower)
+bbSellSignal = ta.crossunder(close, bbUpper)
+plotshape(showBB and bbBuySignal, title="BB Buy", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.tiny)
+plotshape(showBB and bbSellSignal, title="BB Sell", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny)
+
+// =========================
+// RSI Calculation
+// =========================
+rsiValue = ta.rsi(close, rsiLength)
+rsiOB = rsiValue >= rsiOverbought
+rsiOS = rsiValue <= rsiOversold
+
+plotshape(showRSISignals and rsiOB, title="RSI Overbought", style=shape.circle, location=location.abovebar, color=color.new(color.red, 30), size=size.tiny)
+plotshape(showRSISignals and rsiOS, title="RSI Oversold", style=shape.circle, location=location.belowbar, color=color.new(color.green, 30), size=size.tiny)
+
+// =========================
+// ATR Calculation
+// =========================
+atr_ma(source, len) =>
+    switch atrSmoothing
+        "RMA" => ta.rma(source, len)
+        "SMA" => ta.sma(source, len)
+        "EMA" => ta.ema(source, len)
+        => ta.wma(source, len)
+
+atrValue = atr_ma(ta.tr(true), atrLength)
+
+// =========================
+// RVOL Calculation
+// =========================
+avgVol = array.new_float(0)
+for i = 1 to rvolLookback
+    array.push(avgVol, volume[i])
+rvolValue = volume / array.avg(avgVol)
+rvolSpike = rvolValue >= rvolThreshold
+
+plotshape(showRVOLSignals and rvolSpike, title="RVOL Spike", style=shape.diamond, location=location.top, color=color.new(color.fuchsia, 0), size=size.small)
+
+// =========================
+// Info Table
+// =========================
+getTablePos(pos) =>
+    switch pos
+        "Top Right" => position.top_right
+        "Top Left" => position.top_left
+        "Bottom Right" => position.bottom_right
+        => position.bottom_left
+
+var table infoTable = table.new(getTablePos(tablePosition), 2, 5, bgcolor=color.new(color.gray, 70), border_width=1)
+
+if barstate.islast and showInfoTable
+    table.cell(infoTable, 0, 0, "Indicator", text_color=color.black, text_size=size.small)
+    table.cell(infoTable, 1, 0, "Value", text_color=color.black, text_size=size.small)
+
+    table.cell(infoTable, 0, 1, "RSI", text_color=color.black, text_size=size.small)
+    rsiColor = rsiOB ? color.red : rsiOS ? color.green : color.black
+    table.cell(infoTable, 1, 1, str.tostring(rsiValue, "#.##"), text_color=rsiColor, text_size=size.small)
+
+    table.cell(infoTable, 0, 2, "ATR", text_color=color.black, text_size=size.small)
+    table.cell(infoTable, 1, 2, str.tostring(atrValue, "#.####"), text_color=color.orange, text_size=size.small)
+
+    table.cell(infoTable, 0, 3, "RVOL", text_color=color.black, text_size=size.small)
+    rvolColor = rvolSpike ? color.fuchsia : color.black
+    table.cell(infoTable, 1, 3, str.tostring(rvolValue, "#.##") + "x", text_color=rvolColor, text_size=size.small)
+
+    table.cell(infoTable, 0, 4, "BB %", text_color=color.black, text_size=size.small)
+    bbPct = (close - bbLower) / (bbUpper - bbLower) * 100
+    bbPctColor = bbPct > 80 ? color.red : bbPct < 20 ? color.green : color.black
+    table.cell(infoTable, 1, 4, str.tostring(bbPct, "#.#") + "%", text_color=bbPctColor, text_size=size.small)
+
+// =========================
+// Alerts
+// =========================
+alertcondition(bbBuySignal, title="BB Buy Signal", message="Price crossed above lower Bollinger Band")
+alertcondition(bbSellSignal, title="BB Sell Signal", message="Price crossed below upper Bollinger Band")
+alertcondition(rsiOB, title="RSI Overbought", message="RSI is overbought (>=70)")
+alertcondition(rsiOS, title="RSI Oversold", message="RSI is oversold (<=30)")
+alertcondition(rvolSpike, title="RVOL Spike", message="Relative Volume spike detected")

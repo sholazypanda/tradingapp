@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Alpha — Scanner</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="top-nav">
+    <span class="brand">◆ ALPHA</span>
+    <a href="/">Dashboard</a>
+    <a href="/scan?watchlist={{ watchlist }}">Scanner</a>
+  </div>
+
+  <h1>Wick — Real-Time Scanner</h1>
+  <p class="subtitle">Volume surge, MA acceleration, RSI breakout, MACD cross, and coiling detection — §9.</p>
+
+  <form class="watchlist-form" method="get" action="/scan">
+    <input type="text" name="watchlist" placeholder="AAPL,MSFT,NVDA" value="{{ watchlist }}">
+    <button type="submit">Scan</button>
+  </form>
+
+  <table>
+    <tr>
+      <th>Ticker</th><th>Score</th><th>Volume surge</th><th>Price accel</th>
+      <th>RSI breakout</th><th>MACD cross</th><th>Coiling</th><th>Last close</th>
+    </tr>
+    {% for r in results %}
+    {% if r.error %}
+    <tr><td>{{ r.ticker }}</td><td colspan="7" class="error-list">{{ r.error }}</td></tr>
+    {% else %}
+    <tr>
+      <td><a href="/ticker/{{ r.ticker }}">{{ r.ticker }}</a></td>
+      <td><strong class="{{ 'tick-up' if r.continuation_probability_1_to_10 >= 5 else '' }}">{{ r.continuation_probability_1_to_10 }}</strong>/10</td>
+      <td>{{ "yes" if r.volume_surge else "" }}</td>
+      <td>{{ "yes" if r.price_accel_vs_50ma else "" }}</td>
+      <td>{{ "yes" if r.rsi_breakout_from_oversold else "" }}</td>
+      <td>{{ "yes" if r.macd_crossover else "" }}</td>
+      <td>{{ "yes" if r.coiling else "" }}</td>
+      <td>{{ "%.2f"|format(r.last_close) }}</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </table>
+</body>
+</html>
