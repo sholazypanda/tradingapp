@@ -23,7 +23,11 @@ skills that need more history."""
 BACKTEST_MONTHS = 6
 """Skill 8's explicit, separate long-history budget for backtesting."""
 
-DEFAULT_WATCHLIST = ["AAPL", "MSFT", "NVDA", "AMD", "SPY"]
+DEFAULT_WATCHLIST = [
+    "AAPL", "GOOGL", "INTU", "MU", "NVDA", "SNDK", "AVGO", "WDC", "VRT", "LITE",
+    "COHR", "AMD", "MRVL", "SKM", "BE", "IREN", "STX", "FLNC", "TSLA", "SPCX",
+    "BLZE", "TQQQ", "QMCO",
+]  # synced from TradingView watchlist "Watchlist" (list_id 316627301) via tv CLI
 
 
 class ToolBudgetExceeded(RuntimeError):

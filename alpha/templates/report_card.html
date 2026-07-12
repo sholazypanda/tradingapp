@@ -98,6 +98,36 @@
     {% endif %}
   </div>
 
+  {% set sable = (report.opinions | selectattr('persona', 'equalto', 'Sable') | first) %}
+  {% set seasonality = sable.detail.weekday_seasonality %}
+  <div class="section">
+    <div class="section-title"><span class="dot"></span><h2>Best day to buy/sell — weekday seasonality (6mo)</h2></div>
+    <p class="empty-state">Average same-day return and win rate per weekday, {{ seasonality.bars_analyzed }} trading days analyzed. Small sample (~20-27 days/weekday) — a tendency, not a rule.</p>
+    <div class="meta-row">
+      <span>Best day to buy: <strong class="tick-up">{{ seasonality.best_day_to_buy }}</strong></span>
+      <span>Best day to sell: <strong class="tick-down">{{ seasonality.best_day_to_sell }}</strong></span>
+    </div>
+    <table>
+      <tr><th>Weekday</th><th>Avg return</th><th>Win rate</th><th>Days</th></tr>
+      {% for day, stats in seasonality.by_weekday.items() %}
+      <tr class="{{ 'confidence-note' if day in (seasonality.best_day_to_buy, seasonality.best_day_to_sell) }}">
+        <td>
+          {{ day }}
+          {% if day == seasonality.best_day_to_buy %}<span class="badge buy">BUY</span>{% endif %}
+          {% if day == seasonality.best_day_to_sell %}<span class="badge sell">SELL</span>{% endif %}
+        </td>
+        {% if stats.available %}
+        <td class="{{ 'tick-up' if stats.avg_return_pct >= 0 else 'tick-down' }}">{{ "%+.3f"|format(stats.avg_return_pct) }}%</td>
+        <td>{{ stats.win_rate_pct }}%</td>
+        <td>{{ stats.n_days }}</td>
+        {% else %}
+        <td colspan="3" class="empty-state">Not enough samples ({{ stats.n_days }} day(s)).</td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
   <div class="section">
     <div class="section-title"><span class="dot"></span><h2>Execution log</h2></div>
     <p class="empty-state">Live trace of every tool call and evaluation step each agent actually ran for this analysis.</p>

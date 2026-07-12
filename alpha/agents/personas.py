@@ -92,6 +92,9 @@ def sable_sentiment(ticker: str, budget: ToolBudget) -> dict:
     result = sentiment.analyze(ticker)
     budget.note("Sable", "→ crowd/news", f"crowd_available={result['crowd_sentiment']['available']}, "
                 f"headlines={len(result['recent_headlines'])}, news_score={result['news_sentiment_score']}")
+    seasonality = result["weekday_seasonality"]
+    budget.note("Sable", "→ weekday seasonality (6mo)",
+                f"best buy day={seasonality['best_day_to_buy']}, best sell day={seasonality['best_day_to_sell']}")
 
     signal = "neutral"
     if result["contrarian_caution_flag"]:

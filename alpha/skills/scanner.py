@@ -20,6 +20,18 @@ def _macd(close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> 
     return macd_line, signal_line
 
 
+def _crossed_above_within(a: pd.Series, b: pd.Series, window: int) -> bool:
+    """True if `a` crossed above `b` at any point in the last `window` bars —
+    not just on the single most-recent bar. A cross that happened 2-3 days
+    ago and has since cooled off is still the kind of early spike setup §9
+    means by "last 1-5 days," not something the scanner should miss.
+    """
+    a_recent, b_recent = a.iloc[-(window + 1):], b.iloc[-(window + 1):]
+    was_below = a_recent.shift(1) <= b_recent.shift(1)
+    is_above = a_recent > b_recent
+    return bool((was_below & is_above).iloc[1:].any())
+
+
 def scan_one(ticker: str) -> dict:
     df = fetch_ohlcv(ticker, bars=220)  # needs the 200-bar MA, wider than the §12 default on purpose
 
@@ -27,10 +39,11 @@ def scan_one(ticker: str) -> dict:
     ma_50, ma_200 = close.rolling(50).mean(), close.rolling(200).mean()
     macd_line, macd_signal = _macd(close)
 
-    volume_surge = float(df["rvol_30"].iloc[-1]) >= 1.5
+    surge_window = 5
+    volume_surge = bool((df["rvol_30"].tail(surge_window) >= 1.5).any())
     price_accel_vs_50ma = bool(close.iloc[-1] > ma_50.iloc[-1] > ma_200.iloc[-1]) if pd.notna(ma_200.iloc[-1]) else None
-    rsi_breakout = bool(df["rsi_14"].iloc[-2] <= 30 < df["rsi_14"].iloc[-1])
-    macd_crossover = bool(macd_line.iloc[-2] <= macd_signal.iloc[-2] and macd_line.iloc[-1] > macd_signal.iloc[-1])
+    rsi_breakout = _crossed_above_within(df["rsi_14"], pd.Series(30, index=df.index), surge_window)
+    macd_crossover = _crossed_above_within(macd_line, macd_signal, surge_window)
 
     # "Coiling": recent realized vol well below its own 60-bar average = contraction
     vol_now, vol_avg = float(df["vol_20"].iloc[-1]), float(df["vol_20"].tail(60).mean())

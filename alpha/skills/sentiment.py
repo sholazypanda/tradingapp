@@ -64,6 +64,49 @@ def backtest_rsi_thresholds(ticker: str, oversold_candidates=(20, 25, 30, 35), o
     return {"best_oversold_entry": best, "best_overbought_exit": worst, "bars_analyzed": len(df)}
 
 
+WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+
+
+def weekday_seasonality(ticker: str, min_samples: int = 3) -> dict:
+    """Day-of-week seasonality over the §12 6-month backtest window: for each
+    weekday, the average same-day return and win rate. Classic "day-of-week
+    effect" methodology (French, 1980) — not RSI-based, and not about
+    specific calendar dates, just which weekday (Mon-Fri) this ticker has
+    tended to be strong or weak on recently.
+
+    "Best day to buy" = the weekday with the lowest average return (the
+    ticker's typical relative dip during the week — cheapest average entry).
+    "Best day to sell" = the weekday with the highest average return (the
+    ticker's typical relative strength — best average day to realize gains).
+    """
+    df = fetch_ohlcv_backtest(ticker)
+    weekday_idx = df.index.weekday  # 0=Monday ... 4=Friday (weekends aren't trading days anyway)
+
+    by_day = {}
+    for i, name in enumerate(WEEKDAY_NAMES):
+        day_returns = df["return"][weekday_idx == i]
+        if len(day_returns) < min_samples:
+            by_day[name] = {"available": False, "n_days": int(len(day_returns))}
+            continue
+        by_day[name] = {
+            "available": True,
+            "avg_return_pct": round(float(day_returns.mean()) * 100, 3),
+            "win_rate_pct": round(float((day_returns > 0).mean()) * 100, 1),
+            "n_days": int(len(day_returns)),
+        }
+
+    available_days = {name: d for name, d in by_day.items() if d["available"]}
+    best_buy = min(available_days, key=lambda n: available_days[n]["avg_return_pct"]) if available_days else None
+    best_sell = max(available_days, key=lambda n: available_days[n]["avg_return_pct"]) if available_days else None
+
+    return {
+        "by_weekday": by_day,
+        "best_day_to_buy": best_buy,
+        "best_day_to_sell": best_sell,
+        "bars_analyzed": len(df),
+    }
+
+
 def analyze(ticker: str) -> dict:
     """Returns crowd sentiment, recent news (+ optional FinBERT score), and
     the 6-month RSI backtest — the three pieces of §8.
@@ -82,4 +125,5 @@ def analyze(ticker: str) -> dict:
         "recent_headlines": headlines,
         "news_sentiment_score": news_sentiment_score,
         "rsi_backtest_6mo": backtest_rsi_thresholds(ticker),
+        "weekday_seasonality": weekday_seasonality(ticker),
     }
