@@ -1,14 +1,16 @@
 """Skill 8 — Sentiment, News & Backtesting (Sable).
 
-Stocktwits crowd tally + recent Yahoo Finance headlines + a 6-month RSI
-backtest, per tradingskills.md §8. FinBERT scoring of the Yahoo headlines
-is optional (only runs if `transformers`/`torch` are installed) — falls
-back to leaving headlines unscored rather than failing the whole skill.
+Stocktwits crowd tally + recent headlines (Finnhub first, Yahoo Finance as
+fallback) + a 6-month RSI backtest, per tradingskills.md §8. FinBERT scoring
+of the headlines is optional (only runs if `transformers`/`torch` are
+installed) — falls back to leaving headlines unscored rather than failing
+the whole skill.
 """
 
 from __future__ import annotations
 
-from alpha.data_sources import stocktwits
+from alpha.config import FINNHUB_API_KEY
+from alpha.data_sources import finnhub_news, stocktwits
 from alpha.data_sources.market_data import fetch_ohlcv_backtest
 
 
@@ -20,6 +22,24 @@ def _recent_yahoo_headlines(ticker: str, limit: int = 10) -> list[str]:
     except Exception:
         return []
     return [item.get("title", "") for item in news[:limit] if item.get("title")]
+
+
+def _recent_headlines(ticker: str, limit: int = 10) -> tuple[list[str], str]:
+    """Prefers Finnhub (more reliable free tier — see the §6.1 notebook's
+    comparison of Finnhub/Alpha Vantage/Stocktwits) when an API key is
+    configured; falls back to Yahoo Finance's news endpoint otherwise or if
+    Finnhub returns nothing. Returns (headlines, source) so the trace/report
+    card can say where they actually came from, not just that they exist.
+    """
+    if FINNHUB_API_KEY:
+        try:
+            headlines = finnhub_news.fetch_recent_headlines(ticker, days=7)[:limit]
+            if headlines:
+                return headlines, "finnhub"
+        except Exception:
+            pass  # fall through to Yahoo rather than failing the whole skill
+
+    return _recent_yahoo_headlines(ticker, limit), "yahoo_finance"
 
 
 def _score_headlines_if_possible(headlines: list[str]) -> float | None:
@@ -112,7 +132,7 @@ def analyze(ticker: str) -> dict:
     the 6-month RSI backtest — the three pieces of §8.
     """
     crowd = stocktwits.crowd_sentiment(ticker)
-    headlines = _recent_yahoo_headlines(ticker)
+    headlines, headline_source = _recent_headlines(ticker)
     news_sentiment_score = _score_headlines_if_possible(headlines)
 
     contrarian_flag = (
@@ -123,6 +143,7 @@ def analyze(ticker: str) -> dict:
         "crowd_sentiment": crowd,
         "contrarian_caution_flag": bool(contrarian_flag),
         "recent_headlines": headlines,
+        "headline_source": headline_source,
         "news_sentiment_score": news_sentiment_score,
         "rsi_backtest_6mo": backtest_rsi_thresholds(ticker),
         "weekday_seasonality": weekday_seasonality(ticker),

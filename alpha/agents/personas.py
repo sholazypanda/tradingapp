@@ -88,10 +88,11 @@ def vance_fundamentals(ticker: str, budget: ToolBudget) -> dict:
 
 def sable_sentiment(ticker: str, budget: ToolBudget) -> dict:
     """Sentiment Analyst — §8 crowd + news + insider positioning."""
-    budget.spend("Sable", "sentiment.analyze(ticker)", "Stocktwits + Yahoo news + 6mo RSI backtest")
+    budget.spend("Sable", "sentiment.analyze(ticker)", "Stocktwits + Finnhub/Yahoo news + 6mo RSI backtest")
     result = sentiment.analyze(ticker)
     budget.note("Sable", "→ crowd/news", f"crowd_available={result['crowd_sentiment']['available']}, "
-                f"headlines={len(result['recent_headlines'])}, news_score={result['news_sentiment_score']}")
+                f"headlines={len(result['recent_headlines'])} (source={result['headline_source']}), "
+                f"news_score={result['news_sentiment_score']}")
     seasonality = result["weekday_seasonality"]
     budget.note("Sable", "→ weekday seasonality (6mo)",
                 f"best buy day={seasonality['best_day_to_buy']}, best sell day={seasonality['best_day_to_sell']}")

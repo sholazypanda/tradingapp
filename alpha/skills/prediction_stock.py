@@ -14,6 +14,7 @@ number — that's a real, expected state, not an error to hide.
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import numpy as np
@@ -22,6 +23,9 @@ from alpha.config import STOCK_MODEL_ARTIFACT_DIR
 from alpha.data_sources.market_data import fetch_ohlcv
 
 FEATURE_COLS = ["return", "log_return", "vol_20", "rsi_14"]
+
+_BATCH_CACHE_TTL_SECONDS = 60
+_batch_cache: dict[str, tuple[float, dict]] = {}
 
 
 def _artifact_paths(artifact_dir: str) -> dict[str, Path]:
@@ -42,7 +46,25 @@ def predict_all(artifact_dir: str = STOCK_MODEL_ARTIFACT_DIR) -> dict:
 
     Returns {"available": False, "reason": ...} if no checkpoint exists yet,
     otherwise {"available": True, "predictions": {ticker: {...}}}.
+
+    Cached for `_BATCH_CACHE_TTL_SECONDS` — this refetches OHLCV for every
+    ticker in the trained graph (21 in the current checkpoint) and reruns
+    inference, so calling it once per ticker on a multi-ticker dashboard
+    (each `predict()` call for a single ticker would otherwise trigger a
+    full 21-ticker refetch) is the difference between one batch of fetches
+    per page load and N of them.
     """
+    now = time.time()
+    cached = _batch_cache.get(artifact_dir)
+    if cached and now - cached[0] < _BATCH_CACHE_TTL_SECONDS:
+        return cached[1]
+
+    result = _predict_all_uncached(artifact_dir)
+    _batch_cache[artifact_dir] = (now, result)
+    return result
+
+
+def _predict_all_uncached(artifact_dir: str) -> dict:
     paths = _artifact_paths(artifact_dir)
     if not is_trained(artifact_dir):
         return {
