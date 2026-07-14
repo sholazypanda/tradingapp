@@ -14,6 +14,27 @@ BULLISH_SIGNALS = {"bullish"}
 BEARISH_SIGNALS = {"bearish"}
 
 
+def _run_persona(persona_name: str, fn, *args) -> dict:
+    """Isolates one persona's failure from the rest of the report card.
+
+    Rook and Ledger reuse the already-fetched, already-validated shared `df`
+    (see analyze_ticker below), so they aren't wrapped here — a failure
+    there would be a real bug, not a data-availability gap, and the rest of
+    the report card can't be built without their output anyway. Cortex,
+    Vance, Sable, and Wick each do their own separate fetch (e.g. Wick's
+    scanner needs 220 bars vs. the shared df's 60), so one of them lacking
+    enough history for a given ticker shouldn't take down the whole card.
+    """
+    try:
+        return fn(*args)
+    except Exception as exc:
+        return {
+            "persona": persona_name, "signal": "unavailable",
+            "rationale": f"{persona_name} failed: {exc}",
+            "detail": {"available": False, "reason": str(exc)},
+        }
+
+
 def _reconcile(opinions: list[dict]) -> dict:
     bullish = [o for o in opinions if o["signal"] in BULLISH_SIGNALS]
     bearish = [o for o in opinions if o["signal"] in BEARISH_SIGNALS]
@@ -57,11 +78,11 @@ def analyze_ticker(ticker: str) -> dict:
 
     opinions = [
         personas.rook_structure(ticker, df, budget),
-        personas.cortex_forecast(ticker, budget),
-        personas.vance_fundamentals(ticker, budget),
-        personas.sable_sentiment(ticker, budget),
+        _run_persona("Cortex", personas.cortex_forecast, ticker, budget),
+        _run_persona("Vance", personas.vance_fundamentals, ticker, budget),
+        _run_persona("Sable", personas.sable_sentiment, ticker, budget),
         personas.ledger_risk(ticker, df, budget),
-        personas.wick_scanner(ticker, budget),
+        _run_persona("Wick", personas.wick_scanner, ticker, budget),
     ]
     reconciled = _reconcile(opinions)
     budget.note("Alpha", "reconcile(opinions)", f"{reconciled['signal']} — {reconciled['confidence_note']}")

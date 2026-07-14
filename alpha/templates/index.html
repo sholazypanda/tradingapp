@@ -27,9 +27,14 @@
   </div>
   {% endif %}
 
+  <form class="watchlist-form" method="get" action="/go">
+    <input type="text" name="ticker" placeholder="Jump to any ticker — e.g. DRAM, PLTR, BRK.B">
+    <button type="submit">Search</button>
+  </form>
+
   <form class="watchlist-form" method="get" action="/">
     <input type="text" name="watchlist" placeholder="AAPL,MSFT,NVDA" value="{{ watchlist }}">
-    <button type="submit">Load</button>
+    <button type="submit">Load watchlist</button>
   </form>
 
   {% if errors %}

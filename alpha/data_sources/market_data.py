@@ -66,7 +66,12 @@ def fetch_ohlcv(ticker: str, bars: int = DEFAULT_OHLCV_BARS, warmup: int = _WARM
     if isinstance(raw.columns, pd.MultiIndex):
         raw.columns = raw.columns.get_level_values(0)
 
-    enriched = _add_indicators(raw).dropna()
+    # atr_200 needs 200 bars of warmup and is only used by smc.py's EQH/EQL
+    # check, which already tolerates it being NaN — requiring it here would
+    # make every ticker newer than ~1 year unusable for no real benefit.
+    enriched = _add_indicators(raw).dropna(
+        subset=["return", "log_return", "vol_20", "rsi_14", "atr_14", "rvol_30"]
+    )
     if len(enriched) < bars:
         raise ValueError(
             f"Only {len(enriched)} bars available for {ticker} after indicator warmup, "

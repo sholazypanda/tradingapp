@@ -6,9 +6,10 @@ page. No write/execute routes exist — per §13, this app doesn't do that.
 
 from __future__ import annotations
 
+import concurrent.futures
 import time
 
-from flask import Flask, render_template, request
+from flask import Flask, redirect, render_template, request, url_for
 
 from alpha.agents.alpha import analyze_ticker
 from alpha.config import DEFAULT_WATCHLIST
@@ -32,25 +33,57 @@ def _cached_analyze(ticker: str) -> dict:
     return report
 
 
+def _safe_analyze(ticker: str) -> tuple[dict | None, str | None]:
+    try:
+        return _cached_analyze(ticker), None
+    except Exception as exc:  # a bad ticker shouldn't take down the whole dashboard
+        return None, str(exc)
+
+
 @app.route("/")
 def dashboard():
     watchlist = request.args.get("watchlist")
     tickers = [t.strip().upper() for t in watchlist.split(",")] if watchlist else DEFAULT_WATCHLIST
 
+    # Each ticker's 6-persona pipeline is I/O-bound (yfinance/Finnhub/Stocktwits
+    # calls) — running them concurrently is the difference between ~2.5s/ticker
+    # sequentially (55s for a 23-ticker watchlist) and one wall-clock pass.
+    # analyze_ticker() creates its own ToolBudget per call, so there's no
+    # shared mutable state across threads to worry about here.
     reports, errors = [], []
-    for ticker in tickers:
-        try:
-            reports.append(_cached_analyze(ticker))
-        except Exception as exc:  # a bad ticker shouldn't take down the whole dashboard
-            errors.append({"ticker": ticker, "error": str(exc)})
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        for ticker, (report, error) in zip(tickers, executor.map(_safe_analyze, tickers)):
+            if report is not None:
+                reports.append(report)
+            else:
+                errors.append({"ticker": ticker, "error": error})
 
     return render_template("index.html", reports=reports, errors=errors, watchlist=",".join(tickers))
+
+
+@app.route("/go")
+def go():
+    """Jump-to-ticker search box: any symbol yfinance recognizes works here,
+    not just watchlist entries — this isn't a lookup against a fixed list.
+    """
+    ticker = request.args.get("ticker", "").strip().upper()
+    if not ticker:
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("ticker_report", ticker=ticker))
 
 
 @app.route("/ticker/<ticker>")
 def ticker_report(ticker: str):
     ticker = ticker.upper()
-    report = _cached_analyze(ticker)
+    try:
+        report = _cached_analyze(ticker)
+    except Exception as exc:
+        # The dashboard already isolates per-ticker failures (§ dashboard()
+        # above) — this route needs the same treatment for direct navigation
+        # (e.g. the /go search box) to a ticker that fails the initial
+        # fetch_ohlcv call, which happens before any persona runs.
+        return render_template("ticker_error.html", ticker=ticker, error=str(exc)), 404
+
     sparkline_svg = build_sparkline_svg(report["price_series"])
     return render_template("report_card.html", report=report, plain_text=format_text(report), sparkline_svg=sparkline_svg)
 

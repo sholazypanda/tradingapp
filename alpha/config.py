@@ -26,8 +26,13 @@ BACKTEST_MONTHS = 6
 DEFAULT_WATCHLIST = [
     "AAPL", "GOOGL", "INTU", "MU", "NVDA", "SNDK", "AVGO", "WDC", "VRT", "LITE",
     "COHR", "AMD", "MRVL", "SKM", "BE", "IREN", "STX", "FLNC", "TSLA", "SPCX",
-    "BLZE", "TQQQ", "QMCO",
+    "BLZE", "TQQQ", "QMCO", "DRAM",
 ]  # synced from TradingView watchlist "Watchlist" (list_id 316627301) via tv CLI
+# DRAM (Roundhill Memory ETF) added manually — launched 2026-04-02, only ~69
+# trading days of history so far; will show as unavailable on the dashboard
+# until it has ~90 bars (needed for the 60-bar decision window + RVOL's
+# 30-bar warmup), self-resolving in a few more weeks. Add it in TradingView
+# too if you want it to survive the next `tv` CLI re-sync of this list.
 
 
 class ToolBudgetExceeded(RuntimeError):
